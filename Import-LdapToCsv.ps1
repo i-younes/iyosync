@@ -1,3 +1,8 @@
+$CHANGE_TYPE_ADD = "Add"
+$CHANGE_TYPE_UPDATE = "Update"
+$CHANGE_TYPE_DELETE = "Delete"
+$CHANGE_TYPE_NONE = "None"
+
 $SOURCE_ENTRIES_FILE = "D:\iyo\iyosync\sourceEntries.json"
 $TARGET_CSV_FILE = "D:\iyo\iyosync\target.csv"
 
@@ -54,37 +59,33 @@ foreach($responseEntry in $response.entries){
     }
 
     $sourceEntries += $sourceEntry
+    
+    $importChange = New-Object PSObject
     $existingEntry = $oldSourceEntries | Where-Object{$_.$SOURCE_ANCHOR -eq $sourceEntry.$SOURCE_ANCHOR}
     if($existingEntry){
-        if(($sourceEntry | ConvertTo-Json -Compress) -eq ($existingEntry | ConvertTo-Json -Compress)){
-            $importChange = New-Object PSObject
-            $importChange | Add-Member -MemberType NoteProperty -Name "ChangeType" -Value "None"
-            $importChange | Add-Member -MemberType NoteProperty -Name "OldSourceEntry" -Value ""
-            $importChange | Add-Member -MemberType NoteProperty -Name "SourceEntry" -Value $sourceEntry
-            $importChanges += $importChange
+        if(($sourceEntry | ConvertTo-Json -Compress) -eq ($existingEntry | ConvertTo-Json -Compress)){         
+            $importChange | Add-Member -MemberType NoteProperty -Name "ChangeType" -Value $CHANGE_TYPE_NONE
+            $importChange | Add-Member -MemberType NoteProperty -Name "OldSourceEntry" -Value $existingEntry
         }
         else{
-            $importChange = New-Object PSObject
-            $importChange | Add-Member -MemberType NoteProperty -Name "ChangeType" -Value "Update"
+            $importChange | Add-Member -MemberType NoteProperty -Name "ChangeType" -Value $CHANGE_TYPE_UPDATE
             $importChange | Add-Member -MemberType NoteProperty -Name "OldSourceEntry" -Value $existingEntry
-            $importChange | Add-Member -MemberType NoteProperty -Name "SourceEntry" -Value $sourceEntry
-            $importChanges += $importChange
-        }      
+        }    
     }
     else{
         $importChange = New-Object PSObject
-        $importChange | Add-Member -MemberType NoteProperty -Name "ChangeType" -Value "Add"
-        $importChange | Add-Member -MemberType NoteProperty -Name "OldSourceEntry" -Value ""
-        $importChange | Add-Member -MemberType NoteProperty -Name "SourceEntry" -Value $sourceEntry
-        $importChanges += $importChange
+        $importChange | Add-Member -MemberType NoteProperty -Name "ChangeType" -Value $CHANGE_TYPE_ADD
+        $importChange | Add-Member -MemberType NoteProperty -Name "OldSourceEntry" -Value ""   
     }
+    $importChange | Add-Member -MemberType NoteProperty -Name "SourceEntry" -Value $sourceEntry
+    $importChanges += $importChange
 }
 
 foreach($oldSourceEntry in $oldSourceEntries){
     $existingEntry = $sourceEntries | Where-Object{$_.$SOURCE_ANCHOR -eq $oldSourceEntry.$SOURCE_ANCHOR}
     if(!$existingEntry){
         $importChange = New-Object PSObject
-        $importChange | Add-Member -MemberType NoteProperty -Name "ChangeType" -Value "Delete"
+        $importChange | Add-Member -MemberType NoteProperty -Name "ChangeType" -Value $CHANGE_TYPE_DELETE
         $importChange | Add-Member -MemberType NoteProperty -Name "OldSourceEntry" -Value $oldSourceEntry
         $importChange | Add-Member -MemberType NoteProperty -Name "SourceEntry" -Value $existingEntry
         $importChanges += $importChange
@@ -96,7 +97,7 @@ $importChanges.SourceEntry | ConvertTo-Json | Set-Content -Encoding UTF8 -Path $
 $targetEntries = @()
 foreach($importChange in $importChanges){
     $sourceEntry = $importChange.SourceEntry
-    if($sourceEntry.ChangeType -eq "Delete"){
+    if($sourceEntry.ChangeType -eq $CHANGE_TYPE_DELETE){
         continue
     }
 
